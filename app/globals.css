@@ -1,0 +1,20 @@
+/* Tailwind v3 setup */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional: custom styles */
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f9f9f9;
+}
+
+@layer components {
+  .card {
+    @apply bg-white p-6 rounded-xl shadow-md text-center;
+  }
+
+  .button {
+    @apply px-4 py-2 bg-pink-400 text-white rounded hover:bg-pink-500 transition;
+  }
+}
