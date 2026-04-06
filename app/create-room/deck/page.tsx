@@ -3,7 +3,7 @@
 import { db, auth } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { nanoid } from "nanoid";
 import { motion } from "framer-motion";
@@ -104,7 +104,8 @@ const MODE_LABELS: Record<string, string> = {
   family: "Family Mode",
 };
 
-export default function ChooseDeckPage() {
+// ── Inner component that uses useSearchParams ──
+function ChooseDeckContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode") ?? "friend";
@@ -405,5 +406,16 @@ export default function ChooseDeckPage() {
         </motion.div>
       </main>
     </div>
+  );
+}
+
+// ── Default export wraps ChooseDeckContent in Suspense ──
+// This is required because useSearchParams() needs a Suspense
+// boundary to avoid a prerender error during Next.js static export.
+export default function ChooseDeckPage() {
+  return (
+    <Suspense fallback={null}>
+      <ChooseDeckContent />
+    </Suspense>
   );
 }
