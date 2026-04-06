@@ -55,7 +55,7 @@ const defaultDecks = [
       { text: "What's something you wish we talked about more as a family?", type: "comfort" },
       { text: "Where do you see our family in 5 years?", type: "future" },
     ],
-  },
+  }
 ];
 
 export const seedDefaultDecks = async (userId: string, displayName: string) => {

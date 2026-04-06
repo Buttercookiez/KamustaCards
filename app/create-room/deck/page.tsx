@@ -1,13 +1,14 @@
 "use client";
 
 import { db, auth } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { useRouter, useSearchParams } from "next/navigation";
+import { nanoid } from "nanoid";
+import { motion } from "framer-motion";
 import Image from "next/image";
-import { Moon, Sun, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { Moon, Sun, ArrowLeft, ArrowRight, Check } from "lucide-react";
 
 const GlobalStyles = () => (
   <style jsx global>{`
@@ -81,36 +82,52 @@ const GlobalStyles = () => (
       border-bottom-color: var(--text-main) !important;
     }
 
-    .code-input { letter-spacing: 0.35em; text-transform: uppercase; }
-    .code-input::placeholder { letter-spacing: 0.2em; opacity: 0.25; }
-
-    @keyframes spin-slow {
-      from { transform: rotate(0deg); }
-      to   { transform: rotate(360deg); }
+    .minimal-scrollbar::-webkit-scrollbar { width: 2px; }
+    .minimal-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .minimal-scrollbar::-webkit-scrollbar-thumb {
+      background-color: var(--border-subtle);
+      border-radius: 4px;
     }
-    .spin-slow { animation: spin-slow 1.2s linear infinite; }
   `}</style>
 );
 
-type RoomStatus = "waiting" | "playing" | "answering" | "revealing" | "revealed" | "finished";
+type Deck = {
+  id: string;
+  title: string;
+  category: string;
+};
 
-export default function JoinPage() {
+const MODE_LABELS: Record<string, string> = {
+  solo:   "Solo Reflection",
+  friend: "Friend Mode",
+  couple: "Couple Mode",
+  family: "Family Mode",
+};
+
+export default function ChooseDeckPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const mode = searchParams.get("mode") ?? "friend";
 
-  const [authReady, setAuthReady] = useState(false); // true once Firebase auth resolves
-  const [name, setName]           = useState("");
-  const [code, setCode]           = useState("");
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState("");
-  const [theme, setTheme]         = useState<"light" | "dark">("light");
+  const [user, setUser] = useState<any>(null);
+  const [nickname, setNickname] = useState("");
+  const [selectedDeck, setSelectedDeck] = useState("");
+  const [decks, setDecks] = useState<Deck[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [mounted, setMounted] = useState(false);
 
-  // ── Theme — run immediately on mount, no flicker ────────────────────────────
   useEffect(() => {
+    setMounted(true);
     const stored = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const isDark = stored === "dark" || (!stored && prefersDark);
-    setTheme(isDark ? "dark" : "light");
-    document.documentElement.classList.toggle("dark", isDark);
+    if (stored === "dark" || (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+      setTheme("dark");
+      document.documentElement.classList.add("dark");
+    } else {
+      setTheme("light");
+      document.documentElement.classList.remove("dark");
+    }
   }, []);
 
   const toggleTheme = () => {
@@ -120,86 +137,67 @@ export default function JoinPage() {
     document.documentElement.classList.toggle("dark", next === "dark");
   };
 
-  // ── Auth guard + prefill name ───────────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) {
-        router.push("/");
-        return;
-      }
+      if (!u) { router.push("/"); return; }
+      setUser(u);
       const saved = localStorage.getItem("username");
-      setName(saved || u.displayName || "");
-      setAuthReady(true); // show the form now
+      setNickname(saved || u.displayName || "");
     });
     return () => unsub();
   }, [router]);
 
-  // ── Clear error when inputs change ──────────────────────────────────────────
-  useEffect(() => { setError(""); }, [name, code]);
+  useEffect(() => {
+    if (!user) return;
+    const fetchDecks = async () => {
+      const q = query(collection(db, "decks"), where("owner", "==", user.uid));
+      const snap = await getDocs(q);
+      const data = snap.docs.map((d) => ({
+        id: d.id,
+        title: d.data().title,
+        category: d.data().category,
+      }));
+      setDecks(data);
+      if (data.length > 0) setSelectedDeck(data[0].id);
+    };
+    fetchDecks();
+  }, [user]);
 
-  // ── Join logic ──────────────────────────────────────────────────────────────
-  const joinRoom = async (e: React.FormEvent) => {
+  const createRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!name.trim()) { setError("Please enter your nickname."); return; }
-    if (code.trim().length !== 6) { setError("Room code must be 6 characters."); return; }
+    if (!nickname.trim()) { setError("Please enter a nickname"); return; }
+    if (!selectedDeck)    { setError("Please select a deck");    return; }
 
     setLoading(true);
     setError("");
 
     try {
-      const q = query(
-        collection(db, "rooms"),
-        where("roomCode", "==", code.trim().toUpperCase())
-      );
-      const snapshot = await getDocs(q);
+      localStorage.setItem("username", nickname.trim());
+      const roomCode = nanoid(6).toUpperCase();
 
-      if (snapshot.empty) {
-        setError("Room not found. Double-check the code.");
-        setLoading(false);
-        return;
-      }
+      const docRef = await addDoc(collection(db, "rooms"), {
+        roomCode,
+        selectedDeck,
+        mode,
+        currentCard: null,
+        answers: {},
+        answersRevealed: false,
+        readyForNext: [],
+        status: "waiting",
+        players: [],
+        currentDrawer: null,
+        createdBy: user.uid,
+        createdAt: Date.now(),
+      });
 
-      const roomDoc  = snapshot.docs[0];
-      const roomData = roomDoc.data();
-      const status   = roomData.status as RoomStatus;
-
-      if (status === "finished") {
-        setError("This room has already ended.");
-        setLoading(false);
-        return;
-      }
-
-      localStorage.setItem("username", name.trim());
-      router.push(`/room/${roomDoc.id}/lobby`);
-
-    } catch (err) {
-      console.error(err);
-      setError("Something went wrong. Please try again.");
+      router.push(`/room/${docRef.id}/lobby`);
+    } catch {
+      setError("Failed to create room.");
       setLoading(false);
     }
   };
 
-  const canSubmit = name.trim().length > 0 && code.trim().length === 6 && !loading;
-
-  // ── Loading state — shown while Firebase auth resolves ─────────────────────
-  // This replaces the blank screen from "if (!mounted) return null"
-  if (!authReady) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center grain-overlay"
-        style={{ backgroundColor: "var(--bg-base)" }}
-      >
-        <GlobalStyles />
-        <Loader2
-          size={24}
-          strokeWidth={1.5}
-          className="spin-slow"
-          style={{ color: "var(--text-accent)" }}
-        />
-      </div>
-    );
-  }
+  if (!mounted) return null;
 
   return (
     <div className="min-h-screen grain-overlay font-crimson transition-colors duration-500 flex flex-col">
@@ -211,7 +209,6 @@ export default function JoinPage() {
         style={{ backgroundColor: "var(--bg-nav)" }}
       >
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
-
           {/* Logo */}
           <motion.div
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
@@ -222,7 +219,7 @@ export default function JoinPage() {
               className="relative w-7 h-7 rounded-md overflow-hidden border"
               style={{ borderColor: "var(--border-subtle)" }}
             >
-              <Image src="/logo.png" alt="Kamusta Logo" fill sizes="28px" className="object-cover" />
+              <Image src="/logo.png" alt="Kamusta Logo" fill className="object-cover" />
             </div>
             <span
               className="font-cinzel font-semibold text-sm tracking-[0.2em] uppercase hidden sm:block"
@@ -257,7 +254,8 @@ export default function JoinPage() {
               style={{ color: "var(--text-sub)" }}
             >
               <ArrowLeft
-                size={14} strokeWidth={1.5}
+                size={14}
+                strokeWidth={1.5}
                 className="group-hover:text-[var(--text-main)] group-hover:-translate-x-0.5 transition-all"
               />
               <span className="hidden sm:inline group-hover:text-[var(--text-main)] transition-colors">
@@ -282,34 +280,27 @@ export default function JoinPage() {
               className="font-mono text-[10px] uppercase tracking-[0.25em] block mb-4"
               style={{ color: "var(--text-sub)" }}
             >
-              Enter the Lobby
+              {MODE_LABELS[mode] ?? mode} · Step 2 of 2
             </span>
             <h1
               className="text-4xl sm:text-5xl font-crimson font-light tracking-tight"
               style={{ color: "var(--text-main)" }}
             >
-              Join Room
+              Choose Deck
             </h1>
           </div>
 
           {/* Form */}
-          <form onSubmit={joinRoom} className="flex flex-col gap-10">
+          <form onSubmit={createRoom} className="flex flex-col gap-10">
 
-            {/* Error */}
-            <AnimatePresence mode="wait">
-              {error && (
-                <motion.p
-                  key={error}
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.2 }}
-                  className="text-red-500/90 font-mono text-[10px] uppercase tracking-widest text-center"
-                >
-                  {error}
-                </motion.p>
-              )}
-            </AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="text-red-500/90 font-mono text-[10px] uppercase tracking-widest text-center"
+              >
+                {error}
+              </motion.div>
+            )}
 
             {/* Nickname */}
             <div className="flex flex-col gap-3 group">
@@ -322,82 +313,94 @@ export default function JoinPage() {
               <input
                 type="text"
                 placeholder="How should we call you?"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="nickname"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
                 className="minimal-input w-full bg-transparent border-b-2 pb-3 font-crimson text-2xl sm:text-3xl transition-all duration-500 placeholder:opacity-30"
                 style={{ borderColor: "var(--border-subtle)", color: "var(--text-main)" }}
               />
             </div>
 
-            {/* Room Code */}
+            {/* Deck list */}
             <div className="flex flex-col gap-3 group">
-              <div className="flex items-center justify-between">
-                <label
-                  className="font-mono text-[10px] uppercase tracking-[0.2em] transition-colors group-focus-within:text-[var(--text-main)]"
-                  style={{ color: "var(--text-sub)" }}
+              <label
+                className="font-mono text-[10px] uppercase tracking-[0.2em] transition-colors flex justify-between items-center"
+                style={{ color: "var(--text-sub)" }}
+              >
+                <span>Select Deck</span>
+                {decks.length > 0 && (
+                  <span style={{ color: "var(--text-accent)" }}>{decks.length} Available</span>
+                )}
+              </label>
+
+              {decks.length === 0 ? (
+                <div
+                  className="w-full border-b-2 pb-3 font-crimson text-xl transition-all duration-500 flex justify-between items-center cursor-pointer opacity-50 hover:opacity-100"
+                  style={{ borderColor: "var(--border-subtle)", color: "var(--text-main)" }}
+                  onClick={() => router.push("/decks")}
                 >
-                  Room Code
-                </label>
-                <span
-                  className="font-mono text-[9px] tabular-nums transition-colors"
-                  style={{ color: code.length === 6 ? "var(--text-main)" : "var(--border-strong)" }}
-                >
-                  {code.length} / 6
-                </span>
-              </div>
-              <input
-                type="text"
-                placeholder="XXXXXX"
-                maxLength={6}
-                value={code}
-                onChange={(e) => {
-                  const cleaned = e.target.value
-                    .toUpperCase()
-                    .replace(/[^A-Z0-9]/g, "")
-                    .slice(0, 6);
-                  setCode(cleaned);
-                }}
-                onKeyDown={(e) => {
-                  // Block dash, space, and other symbols at the keyboard level
-                  if (/[^a-zA-Z0-9]/.test(e.key) && e.key.length === 1) {
-                    e.preventDefault();
-                  }
-                }}
-                onPaste={(e) => {
-                  e.preventDefault();
-                  const pasted = e.clipboardData
-                    .getData("text")
-                    .toUpperCase()
-                    .replace(/[^A-Z0-9]/g, "")
-                    .slice(0, 6);
-                  setCode(pasted);
-                }}
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="characters"
-                spellCheck={false}
-                inputMode="text"
-                className="code-input minimal-input w-full bg-transparent border-b-2 pb-3 font-mono text-2xl sm:text-3xl transition-all duration-500"
-                style={{ borderColor: "var(--border-subtle)", color: "var(--text-main)" }}
-              />
+                  No decks found
+                  <span className="font-mono text-[9px] uppercase tracking-widest flex items-center gap-1">
+                    Create <ArrowRight className="w-3 h-3" />
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 max-h-48 overflow-y-auto minimal-scrollbar pr-2 mt-2">
+                  {decks.map((deck) => {
+                    const isSelected = selectedDeck === deck.id;
+                    return (
+                      <div
+                        key={deck.id}
+                        onClick={() => setSelectedDeck(deck.id)}
+                        className="flex items-end justify-between border-b-2 pb-3 cursor-pointer transition-all duration-500"
+                        style={{
+                          borderColor: isSelected ? "var(--text-main)" : "var(--border-subtle)",
+                          opacity: isSelected ? 1 : 0.4,
+                        }}
+                      >
+                        <div className="flex flex-col">
+                          <span
+                            className="font-crimson text-xl sm:text-2xl transition-colors line-clamp-1"
+                            style={{ color: "var(--text-main)" }}
+                          >
+                            {deck.title}
+                          </span>
+                          <span
+                            className="font-mono text-[9px] uppercase tracking-[0.2em] mt-1"
+                            style={{ color: "var(--text-sub)" }}
+                          >
+                            {deck.category}
+                          </span>
+                        </div>
+                        <div className="w-6 h-6 flex items-center justify-center mb-1">
+                          {isSelected && (
+                            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                              <Check
+                                className="w-5 h-5"
+                                style={{ color: "var(--text-main)" }}
+                                strokeWidth={1.5}
+                              />
+                            </motion.div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Submit */}
+            {/* Launch */}
             <motion.button
-              whileHover={{ scale: canSubmit ? 1.02 : 1 }}
-              whileTap={{ scale: canSubmit ? 0.98 : 1 }}
+              whileHover={{ scale: loading || !nickname || !selectedDeck ? 1 : 1.02 }}
+              whileTap={{ scale: loading || !nickname || !selectedDeck ? 1 : 0.98 }}
               type="submit"
-              disabled={!canSubmit}
+              disabled={loading || !nickname || !selectedDeck}
               className="mt-6 primary-action h-14 rounded-full font-mono text-[11px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 select-none w-full"
               style={{ color: "var(--action-text)" }}
             >
-              {loading
-                ? <><Loader2 size={16} strokeWidth={1.5} className="spin-slow" /> Joining...</>
-                : <>Enter <ArrowRight className="w-4 h-4" /></>
-              }
+              {loading ? "Creating..." : "Launch"}
+              {!loading && <ArrowRight className="w-4 h-4" />}
             </motion.button>
-
           </form>
         </motion.div>
       </main>
