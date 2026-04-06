@@ -1,4 +1,6 @@
 // app/layout.tsx
+import './globals.css';
+import { SoundProvider } from "@/components/sound-provider";
 import type { Metadata, Viewport } from "next";
 import InstallBanner from "@/components/InstallBanner";
 
@@ -55,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {children}
-        {/* Global install prompt — shows on all pages */}
+        {/* Global install prompt — shows on all pages */}<SoundProvider>{children}</SoundProvider>
         <InstallBanner />
       </body>
     </html>
