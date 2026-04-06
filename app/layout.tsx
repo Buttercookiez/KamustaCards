@@ -39,8 +39,8 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
-  viewportFit: "cover",          // lets content sit behind iOS notch/home indicator
-  userScalable: false,           // feels more native
+  viewportFit: "cover",
+  userScalable: false,
 };
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -56,8 +56,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body>
-        {children}
-        {/* Global install prompt — shows on all pages */}<SoundProvider>{children}</SoundProvider>
+        {/* ✅ children rendered ONCE, wrapped in SoundProvider */}
+        <SoundProvider>
+          {children}
+        </SoundProvider>
         <InstallBanner />
       </body>
     </html>
