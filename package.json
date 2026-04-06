@@ -12,6 +12,7 @@
     "@studio-freight/lenis": "^1.0.42",
     "firebase": "^12.11.0",
     "framer-motion": "^12.38.0",
+    "howler": "^2.2.4",
     "lucide-react": "^1.7.0",
     "nanoid": "^5.1.7",
     "next": "16.2.2",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/howler": "^2.2.12",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
