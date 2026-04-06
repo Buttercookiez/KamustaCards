@@ -315,7 +315,6 @@ const NotebookHero = () => {
 // Simple Auth Button
 import { signInWithPopup, GoogleAuthProvider, getAdditionalUserInfo } from "firebase/auth";
 
-// Replace your existing AuthButton with this one:
 const AuthButton = ({ variant = "primary", className = "" }: { variant?: "primary" | "secondary" | "white"; className?: string }) => {
   const router = useRouter();
 
@@ -324,14 +323,11 @@ const AuthButton = ({ variant = "primary", className = "" }: { variant?: "primar
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
-      // This is the Firebase gold-standard for checking if an account was JUST created
       const details = getAdditionalUserInfo(result);
 
       if (details?.isNewUser) {
-        // Brand new account -> Send to Onboarding
         router.push("/onboarding");
       } else {
-        // Returning user -> Send straight to Dashboard
         router.push("/dashboard");
       }
     } catch (error) {
@@ -410,12 +406,12 @@ const MobileMenu = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (v: boo
               </nav>
               <div className="mt-auto space-y-3 pt-6 border-t border-[#d4c8b8]">
                 <Link 
-  href="/signin" 
-  onClick={() => setIsOpen(false)}
-  className="w-full flex justify-center py-2.5 text-[#6b4423] font-mono text-xs uppercase tracking-wider hover:bg-[#e8e0d4] rounded-lg"
->
-  Sign In
-</Link>
+                  href="/signin" 
+                  onClick={() => setIsOpen(false)}
+                  className="w-full flex justify-center py-2.5 text-[#6b4423] font-mono text-xs uppercase tracking-wider hover:bg-[#e8e0d4] rounded-lg"
+                >
+                  Sign In
+                </Link>
                 <AuthButton className="w-full" />
               </div>
             </div>
@@ -730,7 +726,7 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { scrollY } = useScroll();
 
-  // Initialize Lenis Smooth Scrolling
+  // ✅ FIXED BUG: Properly cancel requestAnimationFrame to prevent double loops
   useEffect(() => {
     const lenis = new Lenis({
       duration: 1.2,
@@ -742,14 +738,17 @@ export default function Home() {
       touchMultiplier: 2,
     });
 
+    let rafId: number;
+
     function raf(time: number) {
       lenis.raf(time);
-      requestAnimationFrame(raf);
+      rafId = requestAnimationFrame(raf);
     }
 
-    requestAnimationFrame(raf);
+    rafId = requestAnimationFrame(raf);
 
     return () => {
+      cancelAnimationFrame(rafId);
       lenis.destroy();
     };
   }, []);
@@ -757,10 +756,9 @@ export default function Home() {
   const headerBg = useTransform(scrollY, [0, 50], ["rgba(250, 247, 240, 0)", "rgba(250, 247, 240, 0.95)"]);
   const headerBorder = useTransform(scrollY, [0, 50], ["rgba(212, 200, 184, 0)", "rgba(212, 200, 184, 1)"]);
   
-useEffect(() => {
+  useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      // We removed the automatic router.push here 
-      // because our AuthButton handles the routing perfectly now!
+      // Handled by AuthButton
     });
     return () => unsub();
   }, []);
@@ -813,13 +811,13 @@ useEffect(() => {
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
             <div className="relative w-8 h-8 rounded-md overflow-hidden shadow-md">
-  <Image 
-    src="/logo.png" 
-    alt="Kamusta Logo" 
-    fill 
-    className="object-cover"
-  />
-</div>
+              <Image 
+                src="/logo.png" 
+                alt="Kamusta Logo" 
+                fill 
+                className="object-cover"
+              />
+            </div>
             <span className="font-cinzel font-semibold text-sm sm:text-base tracking-[0.15em] text-[#3d3128] uppercase hidden sm:block">Kamusta</span>
           </motion.div>
           
@@ -836,9 +834,9 @@ useEffect(() => {
           </div>
 
           <div className="flex items-center gap-3">
-           <Link href="/signin" className="hidden md:block text-xs font-mono uppercase tracking-[0.12em] text-[#6b4423] hover:text-[#3d3128] transition-colors">
-  Sign In
-</Link>
+            <Link href="/signin" className="hidden md:block text-xs font-mono uppercase tracking-[0.12em] text-[#6b4423] hover:text-[#3d3128] transition-colors">
+              Sign In
+            </Link>
             <div className="hidden md:block">
               <AuthButton />
             </div>
@@ -1111,13 +1109,13 @@ useEffect(() => {
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-2 mb-3">
                 <div className="relative w-6 h-6 rounded-md overflow-hidden">
-  <Image 
-    src="/logo.png" 
-    alt="Kamusta Logo" 
-    fill 
-    className="object-cover"
-  />
-</div>
+                  <Image 
+                    src="/logo.png" 
+                    alt="Kamusta Logo" 
+                    fill 
+                    className="object-cover"
+                  />
+                </div>
                 <span className="font-cinzel font-semibold text-[#f5f0e8] text-sm tracking-[0.15em] uppercase">Kamusta</span>
               </div>
               <p className="text-xs text-[#71717a] leading-relaxed mb-4 font-crimson">
