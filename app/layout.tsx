@@ -3,6 +3,7 @@ import './globals.css';
 import { SoundProvider } from "@/components/sound-provider";
 import type { Metadata, Viewport } from "next";
 import InstallBanner from "@/components/InstallBanner";
+import FriendNotifications from "@/components/friend-notifications";
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────
 export const metadata: Metadata = {
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {/* ✅ children rendered ONCE, wrapped in SoundProvider */}
+        <FriendNotifications />
         <SoundProvider>
           {children}
         </SoundProvider>

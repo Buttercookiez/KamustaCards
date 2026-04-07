@@ -1,85 +1,69 @@
 // hooks/usePWA.ts
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
-// The browser fires this before showing the native A2HS prompt.
-// We intercept it so we can show our own styled prompt first.
+// ─── Capture the prompt at module level ───────────────────────────────────────
+// `beforeinstallprompt` can fire BEFORE React even mounts a component.
+// By listening at the top of this module we never miss it.
+let _deferredPrompt: BeforeInstallPromptEvent | null = null;
+
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
-  readonly userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+  readonly userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
   prompt(): Promise<void>;
 }
 
-export interface PWAState {
-  /** true once the SW is registered and ready */
-  isReady: boolean;
-  /** true if the app is already installed / running in standalone */
-  isInstalled: boolean;
-  /** true if we have a deferred install prompt available (Android / desktop Chrome) */
-  canInstall: boolean;
-  /** Call this to trigger the native A2HS prompt */
-  promptInstall: () => Promise<"accepted" | "dismissed" | "unavailable">;
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();                          // stop the mini-infobar
+    _deferredPrompt = e as BeforeInstallPromptEvent;
+    // Dispatch a custom event so any mounted hook can react immediately
+    window.dispatchEvent(new Event("pwa-prompt-ready"));
+  });
 }
+// ─────────────────────────────────────────────────────────────────────────────
 
-export function usePWA(): PWAState {
-  const [isReady, setIsReady]       = useState(false);
+export function usePWA() {
+  const [canInstall, setCanInstall] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    // ── Detect standalone mode (already installed) ──────────────────────────
+    // Already in standalone mode (installed)?
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
-      // iOS Safari
       (navigator as unknown as { standalone?: boolean }).standalone === true;
     setIsInstalled(standalone);
 
-    // ── Register service worker ─────────────────────────────────────────────
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js", { scope: "/" })
-        .then((reg) => {
-          console.log("[SW] registered, scope:", reg.scope);
-          setIsReady(true);
-        })
-        .catch((err) => {
-          console.warn("[SW] registration failed:", err);
-          setIsReady(false);
-        });
-    }
+    // If the prompt was already captured before this hook mounted, use it now.
+    if (_deferredPrompt) setCanInstall(true);
 
-    // ── Capture the A2HS prompt ─────────────────────────────────────────────
-    const handler = (e: Event) => {
-      e.preventDefault(); // stop the browser from auto-showing it
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
+    // Otherwise wait for the custom event we fire above.
+    const onReady = () => setCanInstall(true);
+    window.addEventListener("pwa-prompt-ready", onReady);
 
-    // ── Track if user installs via the browser UI ───────────────────────────
-    window.addEventListener("appinstalled", () => {
+    // Also handle the case where the app gets installed while open.
+    const onInstalled = () => {
       setIsInstalled(true);
-      setDeferredPrompt(null);
-    });
+      setCanInstall(false);
+      _deferredPrompt = null;
+    };
+    window.addEventListener("appinstalled", onInstalled);
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("pwa-prompt-ready", onReady);
+      window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
 
-  const promptInstall = async (): Promise<"accepted" | "dismissed" | "unavailable"> => {
-    if (!deferredPrompt) return "unavailable";
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
+  const promptInstall = useCallback(async (): Promise<"accepted" | "dismissed" | "unavailable"> => {
+    if (!_deferredPrompt) return "unavailable";
+    await _deferredPrompt.prompt();
+    const { outcome } = await _deferredPrompt.userChoice;
+    _deferredPrompt = null;
+    setCanInstall(false);
     return outcome;
-  };
+  }, []);
 
-  return {
-    isReady,
-    isInstalled,
-    canInstall: !!deferredPrompt,
-    promptInstall,
-  };
+  return { canInstall, isInstalled, promptInstall };
 }

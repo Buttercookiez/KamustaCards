@@ -659,17 +659,30 @@ function MultiplayerRoom({ room, roomId, currentUser, theme, toggleTheme }: {
 
   const audioCtxRef   = useRef<AudioContext | null>(null);
   const drawBufferRef = useRef<AudioBuffer | null>(null);
+
   useEffect(() => {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     audioCtxRef.current = ctx;
     loadAudioBuffer("/sounds/drawcard.mp3", ctx).then(b => { drawBufferRef.current = b; });
   }, []);
+
   const playDrawSound = useCallback(() => {
     const ctx = audioCtxRef.current; const buf = drawBufferRef.current;
     if (!ctx || !buf) return;
     const r = ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
     r.then(() => { const s = ctx.createBufferSource(); s.buffer = buf; s.connect(ctx.destination); s.start(0); });
   }, []);
+
+  // ── FIX 2: Play draw sound for ALL players on status change ───────────────
+  // Previously sound only played on click (drawer only).
+  // Now it fires for every client when Firestore status flips to "revealing".
+  const prevStatusRef = useRef<string>("");
+  useEffect(() => {
+    if (room.status === "revealing" && prevStatusRef.current !== "revealing") {
+      playDrawSound();
+    }
+    prevStatusRef.current = room.status;
+  }, [room.status, playDrawSound]);
 
   useEffect(() => {
     if (room.status === "answering" && !room.answers?.[currentUser]) {
@@ -705,6 +718,30 @@ function MultiplayerRoom({ room, roomId, currentUser, theme, toggleTheme }: {
     return () => document.removeEventListener("click", h);
   }, [openReactionFor]);
 
+  // ── FIX 1: Reactively reveal answers when all active players have answered ─
+  // Previously this was checked inside submitAnswer using a local stale copy
+  // of room.answers, causing a race condition where simultaneous submits would
+  // both see the other player's answer as missing and never flip to "revealed".
+  // Now the check runs in a useEffect that reacts to the live Firestore snapshot,
+  // and only the drawer writes the status update to prevent duplicate writes.
+  useEffect(() => {
+    if (room.status !== "answering" || !room.answers) return;
+
+    const active = room.activePlayers?.length ? room.activePlayers : room.players;
+    if (!active || active.length === 0) return;
+
+    const allAnswered = active.every((p: string) => room.answers?.[p] !== undefined);
+    if (!allAnswered) return;
+
+    // Only the drawer triggers the status flip to avoid duplicate writes
+    if (room.currentDrawer !== currentUser) return;
+
+    updateDoc(doc(db, "rooms", roomId), {
+      answersRevealed: true,
+      status: "revealed",
+    });
+  }, [room.status, room.answers, room.activePlayers, room.players, room.currentDrawer, currentUser, roomId]);
+
   // ── Draw: pop from queue — ZERO extra Firestore reads ─────────────────────
   const handleDrawCard = async () => {
     if (room.status === "revealing") return;
@@ -722,9 +759,10 @@ function MultiplayerRoom({ room, roomId, currentUser, theme, toggleTheme }: {
       }
 
       // Pop first card — already has id, text, type. No getDoc needed.
+      // Note: sound is now played by the useEffect above for ALL players,
+      // so we don't call playDrawSound() here anymore.
       const [card, ...rest] = queue;
 
-      playDrawSound();
       await updateDoc(doc(db, "rooms", roomId), {
         currentCard:     card,
         answers:         {},
@@ -741,14 +779,15 @@ function MultiplayerRoom({ room, roomId, currentUser, theme, toggleTheme }: {
     }
   };
 
+  // ── Submit: only write this player's answer, reveal check is reactive ──────
   const submitAnswer = async () => {
     if (!answer.trim()) return;
-    await updateDoc(doc(db, "rooms", roomId), { [`answers.${currentUser}`]: answer.trim() });
-    setHasAnswered(true); setAnswer("");
-    const updated     = { ...(room.answers || {}), [currentUser]: answer.trim() };
-    const active      = room.activePlayers?.length ? room.activePlayers : room.players;
-    const allAnswered = active?.every((p: string) => updated[p] !== undefined);
-    if (allAnswered) await updateDoc(doc(db, "rooms", roomId), { answersRevealed: true, status: "revealed" });
+    await updateDoc(doc(db, "rooms", roomId), {
+      [`answers.${currentUser}`]: answer.trim(),
+    });
+    setHasAnswered(true);
+    setAnswer("");
+    // No allAnswered check here — the useEffect above handles it reactively
   };
 
   const saveCoupleMoment = async () => {
@@ -1197,9 +1236,9 @@ export default function RoomPage() {
     if (!currentUser || !roomId) return;
 
     // Add user to arrays. arrayUnion prevents duplicates automatically on the server.
-    updateDoc(doc(db, "rooms", roomId), { 
+    updateDoc(doc(db, "rooms", roomId), {
       players: arrayUnion(currentUser),
-      activePlayers: arrayUnion(currentUser) 
+      activePlayers: arrayUnion(currentUser)
     });
 
     // Handle closing the browser tab
@@ -1213,7 +1252,7 @@ export default function RoomPage() {
       window.removeEventListener("beforeunload", handleTabClose);
       updateDoc(doc(db, "rooms", roomId), { activePlayers: arrayRemove(currentUser) });
     };
-  }, [currentUser, roomId]); 
+  }, [currentUser, roomId]);
 
   if (!mounted || !room || !currentUser) {
     return (
