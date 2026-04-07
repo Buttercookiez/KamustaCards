@@ -11,11 +11,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Moon, Sun, Flame, BookOpen, HelpCircle, Heart,
   Target, Key, Coffee, Compass, Search, X, ChevronDown,
-  Trash2, Loader2, CalendarDays, Sparkles, Plus
+  Trash2, Loader2, CalendarDays, Sparkles,
 } from "lucide-react";
-import OnboardingTour from "@/components/onboarding-tour";
-import { useOnboardingTour } from "@/hooks/useOnboardingTour";
-import { journalSteps } from "@/lib/tourSteps";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type JournalEntry = {
@@ -268,12 +265,11 @@ function EmptyState({ hasFilter }: { hasFilter: boolean }) {
 
 // ─── Journal Entry Card ───────────────────────────────────────────────────────
 function EntryCard({
-  entry, onMoodSave, onDelete, dataTour
+  entry, onMoodSave, onDelete,
 }: {
   entry: JournalEntry;
   onMoodSave: (id: string, mood: string) => void;
   onDelete: (id: string) => void;
-  dataTour?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -289,7 +285,6 @@ function EntryCard({
   return (
     <motion.div
       layout
-      data-tour={dataTour}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
@@ -458,7 +453,6 @@ function MoodSummary({ entries }: { entries: JournalEntry[] }) {
 // ═════════════════════════════════════════════════════════════════════════════
 export default function JournalPage() {
   const router = useRouter();
-  const tour = useOnboardingTour("journal");
 
   const [entries, setEntries]       = useState<JournalEntry[]>([]);
   const [streak, setStreak]         = useState<StreakData | null>(null);
@@ -619,42 +613,25 @@ export default function JournalPage() {
       <main className="max-w-3xl mx-auto px-6 pt-32 pb-24">
 
         {/* Page header */}
-        <div className="mb-12 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-          <div>
-            <motion.h1
-              data-tour="journal-header"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="font-crimson text-4xl sm:text-5xl font-light mb-2"
-              style={{ color: "var(--text-main)" }}
-            >
-              Your Reflections
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-              className="font-mono text-[9px] uppercase tracking-[0.3em]"
-              style={{ color: "var(--text-sub)" }}
-            >
-              {entries.length} {entries.length === 1 ? "entry" : "entries"} · solo mode
-            </motion.p>
-          </div>
-
-          {/* New Entry Button for the Onboarding Tour */}
-          <motion.button
-            data-tour="new-entry-btn"
+        <div className="mb-12">
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            className="font-crimson text-4xl sm:text-5xl font-light mb-2"
+            style={{ color: "var(--text-main)" }}
+          >
+            Your Reflections
+          </motion.h1>
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-            onClick={() => router.push("/create-room")}
-            className="flex items-center gap-2 border px-4 py-2 rounded-full font-mono text-[9px] uppercase tracking-widest transition-colors hover:bg-[var(--text-main)] hover:text-[var(--bg-base)]"
-            style={{ color: "var(--text-main)", borderColor: "var(--border-line)" }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+            className="font-mono text-[9px] uppercase tracking-[0.3em]"
+            style={{ color: "var(--text-sub)" }}
           >
-            <Plus size={12} strokeWidth={1.5} />
-            <span>New Entry</span>
-          </motion.button>
+            {entries.length} {entries.length === 1 ? "entry" : "entries"} · solo mode
+          </motion.p>
         </div>
 
         {/* Streak banner */}
@@ -759,10 +736,9 @@ export default function JournalPage() {
                 {/* Cards */}
                 <AnimatePresence>
                   <div className="flex flex-col gap-2">
-                    {monthEntries.map((entry, i) => (
+                    {monthEntries.map(entry => (
                       <EntryCard
                         key={entry.id}
-                        dataTour={gi === 0 && i === 0 ? "entry-card" : undefined}
                         entry={entry}
                         onMoodSave={handleMoodSave}
                         onDelete={handleDelete}
@@ -790,16 +766,6 @@ export default function JournalPage() {
           </motion.div>
         )}
       </main>
-
-      <OnboardingTour 
-        steps={journalSteps} 
-        isOpen={tour.isOpen} 
-        stepIndex={tour.stepIndex} 
-        onNext={() => tour.next(journalSteps.length)} 
-        onPrev={tour.prev} 
-        onSkip={tour.skip} 
-        onFinish={tour.finish} 
-      />
     </div>
   );
 }

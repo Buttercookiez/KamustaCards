@@ -18,9 +18,6 @@ import {
   UserCheck, Clock, Trash2, ExternalLink,
 } from "lucide-react";
 import { useSoundContext } from "@/components/sound-provider";
-import OnboardingTour from "@/components/onboarding-tour";
-import { useOnboardingTour } from "@/hooks/useOnboardingTour";
-import { friendsSteps } from "@/lib/tourSteps";
 
 // ─── Global Styles (same theme as your app) ────────────────────────────────────
 const GlobalStyles = () => (
@@ -115,6 +112,7 @@ const GlobalStyles = () => (
   `}</style>
 );
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 type Friend = {
   uid: string;
   displayName: string;
@@ -306,7 +304,6 @@ function FriendProfileModal({
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function FriendsPage() {
   const router = useRouter();
-  const tour = useOnboardingTour("friends");
   const [user, setUser] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -623,7 +620,7 @@ export default function FriendsPage() {
           <span className="font-mono text-[10px] uppercase tracking-[0.25em] block mb-2" style={{ color: "var(--text-accent)" }}>
             {friends.length} {friends.length === 1 ? "connection" : "connections"}
           </span>
-          <h1 data-tour="friends-header" className="text-4xl sm:text-5xl font-crimson font-medium tracking-tight" style={{ color: "var(--text-main)" }}>
+          <h1 className="text-4xl sm:text-5xl font-crimson font-medium tracking-tight" style={{ color: "var(--text-main)" }}>
             Friends
           </h1>
         </motion.div>
@@ -656,9 +653,7 @@ export default function FriendsPage() {
             { key: "requests", label: "Requests", count: requests.length },
             { key: "add", label: "Add Friend", count: 0 },
           ] as const).map(t => (
-            <button key={t.key} 
-              data-tour={t.key === "add" ? "add-friend-btn" : undefined}
-              onClick={() => setTab(t.key)}
+            <button key={t.key} onClick={() => setTab(t.key)}
               className={`font-mono text-[9px] uppercase tracking-[0.2em] py-3 mr-6 flex items-center gap-2 transition-all ${tab === t.key ? "tab-active" : "opacity-40 hover:opacity-70"}`}
               style={{ color: "var(--text-main)" }}>
               {t.label}
@@ -693,9 +688,7 @@ export default function FriendsPage() {
               ) : (
                 <div className="flex flex-col gap-3">
                   {friends.map((friend, i) => (
-                    <motion.div key={friend.uid} 
-                      data-tour={i === 0 ? "friend-card" : undefined}
-                      custom={i} variants={itemVariants} initial="hidden" animate="visible"
+                    <motion.div key={friend.uid} custom={i} variants={itemVariants} initial="hidden" animate="visible"
                       className="hover-card border rounded-xl p-4 flex items-center gap-4 group"
                       style={{ borderColor: "var(--border-subtle)" }}>
                       <Avatar name={friend.displayName} photo={friend.photoURL} size={44} />
@@ -858,16 +851,6 @@ export default function FriendsPage() {
           )}
         </AnimatePresence>
       </main>
-
-      <OnboardingTour 
-        steps={friendsSteps} 
-        isOpen={tour.isOpen} 
-        stepIndex={tour.stepIndex} 
-        onNext={() => tour.next(friendsSteps.length)} 
-        onPrev={tour.prev} 
-        onSkip={tour.skip} 
-        onFinish={tour.finish} 
-      />
 
       {/* ── Friend Profile Modal ───────────────────────────────────────────────── */}
       <AnimatePresence>
