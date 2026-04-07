@@ -7,7 +7,10 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
-import { Sparkles, Moon, Sun, ChevronLeft, Loader2, Send } from "lucide-react";
+import { Sparkles, Moon, Sun, ChevronLeft, Loader2, Send, ArrowRight } from "lucide-react";
+import OnboardingTour from "@/components/onboarding-tour";
+import { useOnboardingTour } from "@/hooks/useOnboardingTour";
+import { aiSteps } from "@/lib/tourSteps";
 
 const GlobalStyles = () => (
   <style jsx global>{`
@@ -75,6 +78,7 @@ export default function AIPage() {
   const [done, setDone] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const tour = useOnboardingTour("ai");
 
   const SYSTEM_PROMPT = `You are a warm, friendly AI assistant helping users build a custom conversation card deck for the app "Kamusta Cards".
 
@@ -265,10 +269,10 @@ Make cards emotional, deep, and meaningful. Generate as many cards as requested.
       }
       setMessages((prev) => [
         ...prev,
-        { role: "ai", text: `Your deck "${parsed.title}" is ready with ${parsed.cards?.length || 0} cards! Taking you to your library... ✨` },
+        { role: "ai", text: `Your deck "${parsed.title}" is ready with ${parsed.cards?.length || 0} cards! ✨` },
       ]);
       setDone(true);
-      setTimeout(() => router.push("/dashboard"), 2500);
+      // Removed the auto-redirect so user can click the button instead.
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -316,6 +320,7 @@ Make cards emotional, deep, and meaningful. Generate as many cards as requested.
           {/* Right — always visible Kamusta AI label */}
           <div className="flex items-center gap-3">
             <span
+              data-tour="ai-header"
               className="font-mono text-[10px] uppercase tracking-[0.15em] flex items-center gap-1.5"
               style={{ color: "var(--text-accent)" }}
             >
@@ -397,27 +402,15 @@ Make cards emotional, deep, and meaningful. Generate as many cards as requested.
         <div ref={bottomRef} />
       </main>
 
-      {/* Fixed Bottom Area */}
-      {!done && (
-        <div
-          className="fixed bottom-0 left-0 right-0 border-t pb-6 pt-3 px-3 sm:px-4 backdrop-blur-md"
-          style={{ backgroundColor: "var(--bg-nav)", borderColor: "var(--border-subtle)" }}
-        >
-          <div className="max-w-2xl mx-auto flex flex-col gap-2.5">
+      {/* Fixed Bottom Area (Always visible so OnboardingTour doesn't break) */}
+      <div
+        className="fixed bottom-0 left-0 right-0 border-t pb-6 pt-3 px-3 sm:px-4 backdrop-blur-md"
+        style={{ backgroundColor: "var(--bg-nav)", borderColor: "var(--border-subtle)" }}
+      >
+        <div className="max-w-2xl mx-auto flex flex-col gap-2.5">
 
-            {/* Confirm buttons */}
-            {waitingConfirm && (
-              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2">
-                <button className="confirm-btn confirm-yes flex-1" onClick={handleConfirm}>
-                  Yes, create it 
-                </button>
-                <button className="confirm-btn confirm-no flex-1" onClick={handleDecline}>
-                  Not yet
-                </button>
-              </motion.div>
-            )}
-
-            {/* Choice buttons */}
+          {/* ALWAYS rendered for the tour to anchor to safely */}
+          <div data-tour="ai-suggestions" className="w-full">
             {showChoices && (
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap gap-1.5 sm:gap-2">
                 {lastMessage.choices!.map((choice) => (
@@ -427,33 +420,62 @@ Make cards emotional, deep, and meaningful. Generate as many cards as requested.
                 ))}
               </motion.div>
             )}
-
-            {/* Text input */}
-            {showInput && (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder="Type your answer..."
-                  className="flex-1 px-4 py-2.5 rounded-full font-crimson text-sm sm:text-base outline-none border"
-                  style={{ background: "var(--bg-card)", color: "var(--text-main)", borderColor: "var(--border-subtle)" }}
-                />
-                <motion.button
-                  whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                  onClick={handleSend}
-                  disabled={!input.trim()}
-                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-40"
-                  style={{ background: "var(--action-bg)" }}
-                >
-                  <Send size={14} style={{ color: "var(--action-text)" }} />
-                </motion.button>
-              </div>
-            )}
           </div>
+
+          {done ? (
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={() => router.push("/dashboard")}
+              className="w-full primary-action h-12 rounded-full font-mono text-[11px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3"
+              style={{ color: "var(--action-text)" }}
+            >
+              Go to Library <ArrowRight size={16} />
+            </motion.button>
+          ) : waitingConfirm ? (
+            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2">
+              <button className="confirm-btn confirm-yes flex-1" onClick={handleConfirm}>
+                Yes, create it 
+              </button>
+              <button className="confirm-btn confirm-no flex-1" onClick={handleDecline}>
+                Not yet
+              </button>
+            </motion.div>
+          ) : (
+            <div data-tour="ai-input" className="flex items-center gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                placeholder={showInput ? "Type your answer..." : "AI is thinking..."}
+                disabled={!showInput}
+                className="flex-1 px-4 py-2.5 rounded-full font-crimson text-sm sm:text-base outline-none border disabled:opacity-50"
+                style={{ background: "var(--bg-card)", color: "var(--text-main)", borderColor: "var(--border-subtle)" }}
+              />
+              <motion.button
+                whileHover={{ scale: showInput ? 1.05 : 1 }} whileTap={{ scale: showInput ? 0.95 : 1 }}
+                onClick={handleSend}
+                disabled={!showInput || !input.trim()}
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-40"
+                style={{ background: "var(--action-bg)" }}
+              >
+                <Send size={14} style={{ color: "var(--action-text)" }} />
+              </motion.button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+      
+      <OnboardingTour 
+        steps={aiSteps} 
+        isOpen={tour.isOpen} 
+        stepIndex={tour.stepIndex} 
+        onNext={() => tour.next(aiSteps.length)} 
+        onPrev={tour.prev} 
+        onSkip={tour.skip} 
+        onFinish={tour.finish} 
+      />
     </div>
   );
 }

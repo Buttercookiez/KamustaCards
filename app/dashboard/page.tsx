@@ -1,5 +1,13 @@
 "use client";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CHANGES FROM ORIGINAL:
+//  1. Import OnboardingTour + useOnboardingTour + dashboardSteps
+//  2. Add data-tour="<id>" attributes to key UI elements
+//  3. Render <OnboardingTour /> at the bottom of the JSX
+// Everything else is unchanged.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
@@ -26,13 +34,14 @@ import {
   VolumeX,
   SkipBack,
   SkipForward,
-  User, // Added User icon
+  User,
 } from "lucide-react";
 import { useSoundContext } from "@/components/sound-provider";
+import OnboardingTour from "@/components/onboarding-tour";       // ← NEW
+import { useOnboardingTour } from "@/hooks/useOnboardingTour";    // ← NEW
+import { dashboardSteps } from "@/lib/tourSteps";                 // ← NEW
 
-// ============================================
-// CSS VARIABLES & GLOBAL STYLES
-// ============================================
+// ─── Global Styles ───────────────────────────────────────────────────────────
 const GlobalStyles = () => (
   <style jsx global>{`
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Space+Mono:wght@400;700&display=swap');
@@ -112,15 +121,13 @@ const GlobalStyles = () => (
       box-shadow: var(--shadow-primary);
       transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }
-
-    /* Avatar button ring on hover */
     .avatar-btn:hover .avatar-ring {
       border-color: var(--border-strong) !important;
     }
   `}</style>
 );
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 function getInitials(name: string): string {
   const parts = name.trim().split(" ");
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
@@ -146,7 +153,7 @@ const getCategoryIcon = (category: string, className: string = "") => {
   }
 };
 
-// ─── Avatar Button ─────────────────────────────────────────────────────────────
+// ─── Avatar Button ────────────────────────────────────────────────────────────
 function AvatarButton({
   displayName, onClick,
 }: { displayName: string; onClick: () => void }) {
@@ -159,13 +166,8 @@ function AvatarButton({
       style={{ color: "var(--text-main)" }}
       aria-label="View profile"
     >
-      {/* Show icon on mobile, hide on sm+ screens */}
       <User size={15} strokeWidth={1.5} className="sm:hidden" />
-      
-      {/* Show name on sm+ screens, hide on mobile */}
-      <span
-        className="font-mono text-[10px] uppercase tracking-[0.15em] hidden sm:inline"
-      >
+      <span className="font-mono text-[10px] uppercase tracking-[0.15em] hidden sm:inline">
         {displayName.split(" ")[0]}
       </span>
     </motion.button>
@@ -187,6 +189,9 @@ export default function Dashboard() {
 
   const { soundEnabled, trackIndex, trackCount, toggleSound, nextTrack, prevTrack, startIfNeeded } =
     useSoundContext();
+
+  // ── Onboarding tour ──────────────────────────────────────────────────────
+  const tour = useOnboardingTour("dashboard");  // ← NEW
 
   useEffect(() => {
     setMounted(true);
@@ -279,8 +284,9 @@ export default function Dashboard() {
       >
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
 
-          {/* Logo */}
+          {/* Logo — data-tour added */}
           <motion.div
+            data-tour="logo"                     
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             className="flex items-center gap-3 cursor-pointer opacity-90 hover:opacity-100 transition-opacity"
             onClick={() => router.push("/")}
@@ -295,8 +301,8 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-3 sm:gap-4">
 
-            {/* ── Soundtrack controls ── */}
-            <div className="flex items-center gap-2">
+            {/* Soundtrack controls — data-tour added */}
+            <div data-tour="sound-controls" className="flex items-center gap-2">   {/* ← NEW */}
               <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.85 }} onClick={prevTrack}
                 style={{ color: "var(--text-sub)" }} aria-label="Previous track">
                 <SkipBack size={14} strokeWidth={1.5} />
@@ -324,8 +330,9 @@ export default function Dashboard() {
 
             <div className="h-3 w-px bg-[var(--border-subtle)]" />
 
-            {/* Theme toggle */}
+            {/* Theme toggle — data-tour added */}
             <motion.button
+              data-tour="theme-toggle"          
               whileHover={{ scale: 1.1, rotate: theme === "light" ? 15 : -15 }}
               whileTap={{ scale: 0.9 }}
               onClick={toggleTheme}
@@ -337,8 +344,9 @@ export default function Dashboard() {
 
             <div className="h-3 w-px bg-[var(--border-subtle)]" />
 
-            {/* ── Friends link ── */}
+            {/* Friends link — data-tour added */}
             <motion.button
+              data-tour="friends-nav"            
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => router.push("/friends")}
@@ -352,7 +360,7 @@ export default function Dashboard() {
 
             <div className="h-3 w-px bg-[var(--border-subtle)]" />
 
-            {/* ── Avatar → profile ── */}
+            {/* Avatar */}
             {user && (
               <AvatarButton
                 displayName={user.displayName || "User"}
@@ -395,8 +403,9 @@ export default function Dashboard() {
         {/* Quick Actions Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-16">
 
-          {/* Create Room */}
+          {/* Create Room — data-tour added */}
           <motion.button
+            data-tour="create-room"             
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
             whileHover={{ y: -4, transition: { type: "spring", stiffness: 400, damping: 20 } }}
@@ -418,8 +427,9 @@ export default function Dashboard() {
             </div>
           </motion.button>
 
-          {/* Join Room */}
+          {/* Join Room — data-tour added */}
           <motion.button
+            data-tour="join-room"               
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
             whileHover={{ y: -4, transition: { type: "spring", stiffness: 400, damping: 20 } }}
@@ -441,8 +451,9 @@ export default function Dashboard() {
             </div>
           </motion.button>
 
-          {/* Kamusta AI */}
+          {/* Kamusta AI — data-tour added */}
           <motion.button
+            data-tour="kamusta-ai"              
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
             whileHover={{ y: -4, transition: { type: "spring", stiffness: 400, damping: 20 } }}
@@ -465,9 +476,13 @@ export default function Dashboard() {
           </motion.button>
         </div>
 
-        {/* ── Decks Collection Section ────────────────────── */}
+        {/* Decks Collection Section */}
         <div>
-          <div className="flex items-end justify-between border-b pb-4 mb-8 transition-colors" style={{ borderColor: "var(--border-subtle)" }}>
+          <div
+            data-tour="your-library"            
+            className="flex items-end justify-between border-b pb-4 mb-8 transition-colors"
+            style={{ borderColor: "var(--border-subtle)" }}
+          >
             <h2 className="font-crimson text-xl sm:text-2xl font-medium" style={{ color: "var(--text-main)" }}>
               Your Library
             </h2>
@@ -518,10 +533,14 @@ export default function Dashboard() {
           {!loading && decks.length > 0 && (
             <motion.div variants={containerVariants} initial="hidden" animate="visible"
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {decks.map(deck => (
-                <motion.div key={deck.id} variants={itemVariants}
+              {decks.map((deck, i) => (
+                <motion.div
+                  key={deck.id}
+                  variants={itemVariants}
+                  // Add data-tour only on first deck card so spotlight targets it
+                  {...(i === 0 ? { "data-tour": "deck-card" } : {})}
                   whileHover={{ y: -4 }} whileTap={{ scale: 0.98 }}
-                  onClick={() => router.push(`/decks/${deck.id}`)}
+                  onClick={() => router.push(`/decks/edit?id=${deck.id}`)}
                   className="hover-card border rounded-xl p-6 flex flex-col justify-between cursor-pointer group h-36 select-none"
                 >
                   <div className="flex items-start justify-between mb-4">
@@ -563,6 +582,18 @@ export default function Dashboard() {
           )}
         </div>
       </main>
+
+      {/* ── Onboarding Tour ── */}
+      {/* ← NEW: renders the spotlight tooltip tour */}
+      <OnboardingTour
+        steps={dashboardSteps}
+        isOpen={tour.isOpen}
+        stepIndex={tour.stepIndex}
+        onNext={() => tour.next(dashboardSteps.length)}
+        onPrev={tour.prev}
+        onSkip={tour.skip}
+        onFinish={tour.finish}
+      />
     </div>
   );
 }

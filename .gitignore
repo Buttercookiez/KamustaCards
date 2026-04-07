@@ -40,3 +40,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+android/build/
+android/.gradle/
+android/app/build/
+android/app/release/
+android/captures/
+android/.idea/
+
+*.jks
+*.keystore
+google-services.json 

@@ -7,6 +7,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Moon, Sun, ArrowLeft, ArrowRight, Plus, X, Lock, Globe, Users, Heart, Home as HomeIcon, Coffee, Library, Sparkles, Trash2 } from "lucide-react";
+import OnboardingTour from "@/components/onboarding-tour";
+import { useOnboardingTour } from "@/hooks/useOnboardingTour";
+import { decksSteps } from "@/lib/tourSteps";
 
 // ============================================
 // CSS VARIABLES & GLOBAL STYLES (Ultra-Minimal)
@@ -124,6 +127,7 @@ const getCategoryIcon = (id: string, className: string = "") => {
 
 export default function DecksPage() {
   const router = useRouter();
+  const tour = useOnboardingTour("decks");
   const [user, setUser] = useState<any>(null);
   const [decks, setDecks] = useState<Deck[]>([]);
   const[showForm, setShowForm] = useState(false);
@@ -207,7 +211,8 @@ export default function DecksPage() {
         createdAt: Date.now(),
       });
 
-      router.push(`/decks/${docRef.id}`);
+      // FIXED: Pushes to the deck editor instead of throwing 404
+      router.push(`/decks/edit?id=${docRef.id}`);
     } catch (err) {
       console.error(err);
       setLoading(false);
@@ -271,12 +276,13 @@ export default function DecksPage() {
             <span className="font-mono text-[10px] uppercase tracking-[0.3em] block mb-4" style={{ color: 'var(--text-sub)' }}>
               Collection
             </span>
-            <h1 className="text-4xl sm:text-5xl font-light tracking-tight" style={{ color: 'var(--text-main)' }}>
+            <h1 data-tour="decks-header" className="text-4xl sm:text-5xl font-light tracking-tight" style={{ color: 'var(--text-main)' }}>
               Your Decks
             </h1>
           </div>
 
           <motion.button
+            data-tour="new-deck-btn"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setShowForm(!showForm)}
@@ -427,10 +433,12 @@ export default function DecksPage() {
             decks.map((deck, i) => (
               <motion.div
                 key={deck.id}
+                data-tour={i === 0 ? "deck-card" : undefined}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: i * 0.05 }}
-                onClick={() => router.push(`/decks/${deck.id}`)}
+                // FIXED: Now pushes to the editor properly instead of throwing 404
+                onClick={() => router.push(`/decks/edit?id=${deck.id}`)}
                 className="group border-b py-8 cursor-pointer transition-all duration-500 relative"
                 style={{ borderColor: 'var(--border-line)' }}
               >
@@ -478,6 +486,16 @@ export default function DecksPage() {
         </div>
 
       </main>
+
+      <OnboardingTour 
+        steps={decksSteps} 
+        isOpen={tour.isOpen} 
+        stepIndex={tour.stepIndex} 
+        onNext={() => tour.next(decksSteps.length)} 
+        onPrev={tour.prev} 
+        onSkip={tour.skip} 
+        onFinish={tour.finish} 
+      />
 
       {/* -------------------------- */}
       {/* DELETE CONFIRMATION MODAL */}

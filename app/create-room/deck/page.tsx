@@ -191,7 +191,8 @@ function ChooseDeckContent() {
         createdAt: Date.now(),
       });
 
-      router.push(`/room/${docRef.id}/lobby`);
+      router.push(`/lobby?id=${docRef.id}`);
+
     } catch {
       setError("Failed to create room.");
       setLoading(false);

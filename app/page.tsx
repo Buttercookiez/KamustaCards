@@ -4,6 +4,7 @@ import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform, useInView, AnimatePresence } from "framer-motion";
@@ -726,6 +727,7 @@ const StepCard = ({ number, title, description, icon: Icon, isLast }: { number: 
 };
 
 export default function Home() {
+  redirect("/signin"); // or /dashboard, /onboarding — wherever you want the app to start
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { scrollY } = useScroll();

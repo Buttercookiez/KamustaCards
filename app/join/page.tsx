@@ -8,6 +8,9 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { Moon, Sun, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import OnboardingTour from "@/components/onboarding-tour";
+import { useOnboardingTour } from "@/hooks/useOnboardingTour";
+import { joinSteps } from "@/lib/tourSteps";
 
 const GlobalStyles = () => (
   <style jsx global>{`
@@ -96,6 +99,7 @@ type RoomStatus = "waiting" | "playing" | "answering" | "revealing" | "revealed"
 
 export default function JoinPage() {
   const router = useRouter();
+  const tour = useOnboardingTour("join");
 
   const [authReady, setAuthReady] = useState(false); // true once Firebase auth resolves
   const [name, setName]           = useState("");
@@ -171,8 +175,7 @@ export default function JoinPage() {
       }
 
       localStorage.setItem("username", name.trim());
-      router.push(`/room/${roomDoc.id}/lobby`);
-
+      router.push(`/lobby?id=${roomDoc.id}`);
     } catch (err) {
       console.error(err);
       setError("Something went wrong. Please try again.");
@@ -347,6 +350,7 @@ export default function JoinPage() {
                 </span>
               </div>
               <input
+                data-tour="room-code-input"
                 type="text"
                 placeholder="XXXXXX"
                 maxLength={6}
@@ -385,6 +389,7 @@ export default function JoinPage() {
 
             {/* Submit */}
             <motion.button
+              data-tour="join-btn"
               whileHover={{ scale: canSubmit ? 1.02 : 1 }}
               whileTap={{ scale: canSubmit ? 0.98 : 1 }}
               type="submit"
@@ -401,6 +406,19 @@ export default function JoinPage() {
           </form>
         </motion.div>
       </main>
+
+      <OnboardingTour 
+        steps={joinSteps} 
+        isOpen={tour.isOpen} 
+        stepIndex={tour.stepIndex} 
+        onNext={() => tour.next(joinSteps.length)} 
+        onPrev={tour.prev} 
+        onSkip={tour.skip} 
+        onFinish={tour.finish} 
+      />
     </div>
   );
 }
+
+
+

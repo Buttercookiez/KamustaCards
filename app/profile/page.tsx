@@ -16,6 +16,9 @@ import {
   SkipBack, SkipForward, Camera, Check, X, Pencil,
 } from "lucide-react";
 import { useSoundContext } from "@/components/sound-provider";
+import OnboardingTour from "@/components/onboarding-tour";
+import { useOnboardingTour, resetAllTours } from "@/hooks/useOnboardingTour";
+import { profileSteps } from "@/lib/tourSteps";
 
 // ─── Global Styles ─────────────────────────────────────────────────────────────
 const GlobalStyles = () => (
@@ -137,6 +140,7 @@ const TYPE_LABELS: Record<string, string> = {
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function ProfilePage() {
   const router = useRouter();
+  const tour = useOnboardingTour("profile");
 
   const [user, setUser]                     = useState<any>(null);
   const [displayName, setDisplayName]       = useState("");
@@ -412,6 +416,7 @@ export default function ProfilePage() {
 
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
           <motion.button
+            data-tour="profile-avatar"
             type="button"
             whileTap={{ scale: uploadingPhoto ? 1 : 0.97 }}
             onClick={() => { if (!uploadingPhoto) fileInputRef.current?.click(); }}
@@ -498,7 +503,7 @@ export default function ProfilePage() {
         </motion.div>
 
         {/* ── Stats row ────────────────────────────────────────────────────── */}
-        <motion.div custom={1} variants={itemVariants} initial="hidden" animate="visible"
+        <motion.div data-tour="profile-stats" custom={1} variants={itemVariants} initial="hidden" animate="visible"
           className="grid grid-cols-2 gap-4 mb-12">
           <div className="hover-card border rounded-xl p-6 sm:p-8 flex flex-col gap-2">
             <div className="flex items-center gap-2 mb-1">
@@ -605,6 +610,20 @@ export default function ProfilePage() {
               </div>
             ))}
             <div className="flex items-center justify-between px-6 py-4" style={{ borderColor: "var(--border-subtle)" }}>
+              <span className="font-mono text-[9px] uppercase tracking-[0.2em]" style={{ color: "var(--text-sub)" }}>App Guide</span>
+              <button
+                data-tour="replay-tours-btn"
+                onClick={() => {
+                  resetAllTours();
+                  router.push("/dashboard");
+                }}
+                className="font-mono text-[9px] uppercase tracking-[0.15em] flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity"
+                style={{ color: "var(--text-main)" }}
+              >
+                Replay Guides
+              </button>
+            </div>
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderColor: "var(--border-subtle)" }}>
               <span className="font-mono text-[9px] uppercase tracking-[0.2em]" style={{ color: "var(--text-sub)" }}>Session</span>
               <button onClick={() => auth.signOut().then(() => router.push("/"))}
                 className="font-mono text-[9px] uppercase tracking-[0.15em] flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity"
@@ -616,6 +635,16 @@ export default function ProfilePage() {
         </motion.div>
 
       </main>
+
+      <OnboardingTour 
+        steps={profileSteps} 
+        isOpen={tour.isOpen} 
+        stepIndex={tour.stepIndex} 
+        onNext={() => tour.next(profileSteps.length)} 
+        onPrev={tour.prev} 
+        onSkip={tour.skip} 
+        onFinish={tour.finish} 
+      />
 
       {/* ── Toast ─────────────────────────────────────────────────────────── */}
       <AnimatePresence>
