@@ -26,6 +26,7 @@ import {
   VolumeX,
   SkipBack,
   SkipForward,
+  User, // Added User icon
 } from "lucide-react";
 import { useSoundContext } from "@/components/sound-provider";
 
@@ -154,12 +155,16 @@ function AvatarButton({
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
       onClick={onClick}
-      className="flex items-center gap-1 group"
+      className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity group"
+      style={{ color: "var(--text-main)" }}
       aria-label="View profile"
     >
+      {/* Show icon on mobile, hide on sm+ screens */}
+      <User size={15} strokeWidth={1.5} className="sm:hidden" />
+      
+      {/* Show name on sm+ screens, hide on mobile */}
       <span
-        className="font-mono text-[10px] uppercase tracking-[0.15em] opacity-60 group-hover:opacity-100 transition-opacity"
-        style={{ color: "var(--text-main)" }}
+        className="font-mono text-[10px] uppercase tracking-[0.15em] hidden sm:inline"
       >
         {displayName.split(" ")[0]}
       </span>
